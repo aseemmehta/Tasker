@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Session Ledger</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏱️</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#eaf0f3;--card:#fff;--ink:#12202b;--mute:#5d7080;--line:#d3dde3;--acc:#059669;--accink:#fff;--ok:#064e3b;--bar:#c6ebdf;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0e1820;--card:#16242f;--ink:#e6eef3;--mute:#8aa0b0;--line:#2a3c49;--acc:#059669;--accink:#fff;--ok:#6ee7b7;--bar:#14463a;color-scheme:dark}}
+:root[data-theme="dark"]{--bg:#0e1820;--card:#16242f;--ink:#e6eef3;--mute:#8aa0b0;--line:#2a3c49;--acc:#059669;--accink:#fff;--ok:#6ee7b7;--bar:#14463a;color-scheme:dark}
+html{scroll-padding-top:env(safe-area-inset-top,0px)}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 Sora,system-ui,-apple-system,"Segoe UI",sans-serif}
+main{max-width:760px;margin:0 auto;padding:16px}
+header{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-bottom:16px}
+h1{font-size:18px;margin:0 auto 0 0;letter-spacing:-.01em}
+h2{font-size:16px;margin:24px 0 10px}
+h3{font-size:16px;margin:0}
+button,select,input{font:inherit;color:var(--ink)}
+button{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px 12px;cursor:pointer;min-height:38px}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
+button.p{background:var(--acc);color:var(--accink);border-color:var(--acc);font-weight:600}
+button.run{background:var(--ink);color:var(--bg);border-color:var(--ink);font-weight:600}
+button.g{border-color:transparent;background:transparent;color:var(--mute)}
+select,input{border:1px solid var(--line);background:var(--card);border-radius:8px;padding:8px;min-height:38px;max-width:100%}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:14px;margin-bottom:12px}
+.card.live{border-color:var(--acc);box-shadow:0 0 0 1px var(--acc)}
+.row{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
+.sp{margin-left:auto}
+.clock{font-size:26px;font-weight:700;font-variant-numeric:tabular-nums;letter-spacing:-.02em}
+.mute{color:var(--mute);font-size:13px}
+.bar{height:6px;background:var(--bar);border-radius:3px;margin:10px 0 4px;overflow:hidden}
+.bar i{display:block;height:100%;background:var(--acc);width:0}
+.bar i.done{background:var(--ok)}
+.ses{border-top:1px solid var(--line);padding:8px 0;display:flex;gap:6px;align-items:center;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+.day{font-weight:600;font-size:13px;margin-top:10px}
+.seg{display:inline-flex;border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.seg button{border:0;border-radius:0;background:transparent}
+.seg button.on{background:var(--acc);color:var(--accink)}
+.chart{display:flex;gap:6px;align-items:flex-end;height:140px;padding-top:18px}
+.col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;align-items:center;height:100%;min-width:0}
+.col b{width:100%;background:var(--acc);border-radius:4px 4px 0 0;min-height:2px}
+.col span{font-size:11px;color:var(--mute);margin-top:4px;white-space:nowrap}
+.col em{font-style:normal;font-size:11px;font-variant-numeric:tabular-nums}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));gap:8px;margin-top:10px}
+.stats div{background:var(--bg);border-radius:8px;padding:8px}
+.stats strong{display:block;font-size:17px}
+.hb{height:10px;background:var(--acc);border-radius:5px;min-width:2px}
+.chk{display:inline-flex;gap:4px;align-items:center;margin-right:10px}
+.chk input{min-height:auto}
+.empty{text-align:center;color:var(--mute);padding:28px 8px}.pill{font-size:12px;color:var(--mute);border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:var(--card)}.pill.err{color:#dc2626;border-color:#dc2626}.pill button{min-height:28px;padding:2px 8px;margin-left:6px}
+</style>
+</head>
+<body>
+<main>
+<header>
+  <h1>Session Ledger</h1>
+  <span id="saved" class="pill" role="status"></span>
+  <select id="dsel" data-c="cur" aria-label="Dashboard"></select>
+  <button id="tabbtn" data-a="tab"></button>
+  <button class="g" data-a="theme" aria-label="Toggle theme">◐</button>
+</header>
+<div id="app"></div>
+
+</main>
+<script>
+const uid=()=>Math.random().toString(36).slice(2,9);
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+/* Storage layer: swap this object for a Google Drive / iCloud backend later. */
+const Store={key:'session-ledger.v1',
+  load(){try{return JSON.parse(localStorage.getItem(this.key))}catch(e){return null}},
+  save(d){try{localStorage.setItem(this.key,JSON.stringify(d));return true}catch(e){return false}}};
+function seed(){const a=uid(),b=uid(),d=uid();return{v:1,cur:d,tasks:[{id:a,name:'LeetCode',goal:90,s:[]},{id:b,name:'Reading',goal:30,s:[]}],dashes:[{id:d,name:'Daily practice',tasks:[a,b]}]}}
+let D=Store.load()||seed();migrate();
+function migrate(){D.tasks.forEach(t=>{if(t.gv===undefined){t.gv=t.goal||0;t.gu='min/day'}t.desc=t.desc||''});D.dashes.forEach(d=>d.desc=d.desc||'')}
+const GU=['min/day','hour/day','min/week','hour/week'];
+const guSel=(v,a)=>`<select ${a} aria-label="Goal unit">${GU.map(u=>`<option ${u===(v||'min/day')?'selected':''}>${u}</option>`).join('')}</select>`;
+/* Optional file backend: a data file inside your synced Drive folder (desktop Chrome/Edge). */
+const FS={ok:'showSaveFilePicker' in window,h:null,q:null,
+ db(){return new Promise((r,j)=>{const q=indexedDB.open('sl',1);q.onupgradeneeded=()=>q.result.createObjectStore('k');q.onsuccess=()=>r(q.result);q.onerror=j})},
+ async put(h){(await this.db()).transaction('k','readwrite').objectStore('k').put(h,'h')},
+ async get(){const db=await this.db();return new Promise(r=>{const q=db.transaction('k').objectStore('k').get('h');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})},
+ async load(){const f=await this.h.getFile(),j=JSON.parse(await f.text());if(!j.tasks||!j.dashes)return false;D=j;migrate();this.seen=f.lastModified;return true},
+ write(){this.q=(this.q||Promise.resolve()).catch(()=>{}).then(async()=>{this.busy=1;try{const f=await this.h.getFile();if(this.seen&&f.lastModified!==this.seen){try{merge(JSON.parse(await f.text()));this.merged=1}catch(e){}}const w=await this.h.createWritable();await w.write(JSON.stringify(D,null,1));await w.close();this.seen=(await this.h.getFile()).lastModified}finally{this.busy=0}});return this.q}};
+const FT={types:[{description:'JSON',accept:{'application/json':['.json']}}]};
+const FB='<button class="p" data-a="mkfile">Create new data file</button><button data-a="openfile">Use existing data file</button>';
+/* Google Drive backend: works in any modern browser. Needs an OAuth client ID and a page served over https. */
+const CLIENT_ID='';
+const LS={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
+const API='https://www.googleapis.com/drive/v3/files',UP='https://www.googleapis.com/upload/drive/v3/files';
+const GD={cid:LS.get('sl-cid')||CLIENT_ID,on:LS.get('sl-mode')==='drive',fid:LS.get('sl-fid'),tok:'',exp:0,seen:'',busy:0,q:null,ready:false,
+ lib(){return new Promise((r,j)=>{if(window.google&&google.accounts)return r();const s=document.createElement('script');s.src='https://accounts.google.com/gsi/client';s.onload=r;s.onerror=()=>j(new Error('Could not load Google sign-in'));document.head.appendChild(s)})},
+ async auth(i){if(this.tok&&now()<this.exp)return;if(!i){st.need=true;throw new Error('Signed out of Google')}if(!this.cid)throw new Error('Add your Google client ID in Settings');await this.lib();
+  await new Promise((r,j)=>{google.accounts.oauth2.initTokenClient({client_id:this.cid,scope:'https://www.googleapis.com/auth/drive.file',callback:x=>{if(x.error)return j(new Error(x.error));this.tok=x.access_token;this.exp=now()+(x.expires_in-60)*1000;r()},error_callback:e=>j(new Error(e.type||'Sign-in cancelled'))}).requestAccessToken({prompt:this.fid?'':'consent'})})},
+ async api(url,o={}){await this.auth(false);const r=await fetch(url,{...o,headers:{...(o.headers||{}),Authorization:'Bearer '+this.tok}});if(r.status===401){this.tok='';st.need=true}if(!r.ok)throw new Error('Drive error '+r.status);return r},
+ async meta(){return(await(await this.api(`${API}/${this.fid}?fields=modifiedTime`)).json()).modifiedTime},
+ async read(){return(await this.api(`${API}/${this.fid}?alt=media`)).json()},
+ async create(){const b='sl'+uid(),body=[`--${b}`,'Content-Type: application/json','','{"name":"session-ledger-data.json","mimeType":"application/json"}',`--${b}`,'Content-Type: application/json','',JSON.stringify(D),`--${b}--`].join('\r\n');
+  const r=await(await this.api(`${UP}?uploadType=multipart&fields=id,modifiedTime`,{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+b},body})).json();this.fid=r.id;LS.set('sl-fid',r.id);this.seen=r.modifiedTime},
+ async load(){if(this.fid){try{await this.meta()}catch(e){if(st.need)throw e;this.fid=null}}
+  if(!this.fid){const r=await(await this.api(`${API}?q=${encodeURIComponent(`name='session-ledger-data.json' and trashed=false`)}&fields=files(id)`)).json();if(r.files[0]){this.fid=r.files[0].id;LS.set('sl-fid',this.fid)}}
+  if(this.fid){const j=await this.read();if(j.tasks&&j.dashes){D=j;migrate()}this.seen=await this.meta()}else await this.create()},
+ write(){this.q=(this.q||Promise.resolve()).catch(()=>{}).then(async()=>{this.busy=1;try{const m=await this.meta();if(this.seen&&m!==this.seen){merge(await this.read());FS.merged=1}
+  const r=await(await this.api(`${UP}/${this.fid}?uploadType=media&fields=modifiedTime`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(D)})).json();this.seen=r.modifiedTime}finally{this.busy=0}});return this.q},
+ async pull(){const m=await this.meta();if(m===this.seen)return false;const j=await this.read();if(j.tasks&&j.dashes){D=j;migrate();this.seen=m;return true}return false}};
+const B=()=>GD.on?GD:FS.h?FS:null,bn=()=>GD.on?'Google Drive':FS.h.name;
+/* Another browser wrote the file between our read and write: keep our changes, add anything we have not seen. */
+function merge(R){if(!R.tasks||!R.dashes)return;R.tasks.forEach(rt=>{const t=task(rt.id);if(!t)D.tasks.push(rt);else rt.s.forEach(x=>{const y=t.s.find(z=>z.id===x.id);if(!y)t.s.push(x);else if(!y.e&&x.e)y.e=x.e})});R.dashes.forEach(rd=>{if(!D.dashes.find(d=>d.id===rd.id))D.dashes.push(rd)})}
+/* Pick up changes made through another browser. */
+async function pull(){if(!B()||st.need||ui.boot||B().busy)return;const a=document.activeElement;if(a&&/INPUT|SELECT|TEXTAREA/.test(a.tagName))return;
+ try{if(GD.on){if(await GD.pull()){savedAt=now();render()}return}const f=await FS.h.getFile();if(f.lastModified===FS.seen)return;const j=JSON.parse(await f.text());if(j.tasks&&j.dashes){D=j;migrate();FS.seen=f.lastModified;savedAt=now();render()}}catch(e){}}
+function banner(){if(B())return'';return `<div class="card"><strong>Data is only in this browser's cache.</strong><p class="mute">Connect Google Drive so one JSON file is the source of truth on every device and browser.</p><div class="row"><button class="p" data-a="gdconnect">Connect Google Drive</button>${FS.ok?'<button data-a="mkfile">Use a local file instead</button>':''}</div></div>`}
+function lock(){return `<div class="card"><strong>Data: ${esc(bn())}</strong><p class="mute">Your data lives there. ${GD.on?'Sign in to Google':'Allow access'} so it can be loaded.</p><div class="row"><button class="p" data-a="reconnect">Continue</button></div></div>`}
+const goalInfo=t=>{if(!t.gv)return null;const u=t.gu||'min/day',w=u.endsWith('week'),ms=t.gv*(u.startsWith('hour')?3600000:60000);return{ms,w,done:w?weekMs(t):todayMs(t)}};
+const weekMs=t=>{const k=dk(wk(now()));return t.s.filter(x=>dk(wk(x.s))===k).reduce((a,x)=>a+dur(x),0)};
+let ui={tab:'dash',range:'day',chart:'bar',open:{},edit:null,boot:true};
+const now=()=>Date.now();
+const p2=n=>String(n).padStart(2,'0');
+const dk=t=>{const d=new Date(t);return d.getFullYear()+'-'+p2(d.getMonth()+1)+'-'+p2(d.getDate())};
+const dur=x=>(x.e||now())-x.s;
+const clk=ms=>{const s=Math.floor(ms/1000);return p2(Math.floor(s/3600))+':'+p2(Math.floor(s/60)%60)+':'+p2(s%60)};
+const hm=ms=>{const m=Math.round(ms/60000);return m>=60?Math.floor(m/60)+'h '+(m%60)+'m':m+'m'};
+const loc=t=>{const d=new Date(t);return dk(t)+'T'+p2(d.getHours())+':'+p2(d.getMinutes())};
+const tm=t=>{const d=new Date(t);return p2(d.getHours())+':'+p2(d.getMinutes())};
+const task=id=>D.tasks.find(t=>t.id===id);
+const cur=()=>D.dashes.find(d=>d.id===D.cur)||D.dashes[0];
+const running=t=>t.s.find(x=>!x.e);
+const todayMs=t=>t.s.filter(x=>dk(x.s)===dk(now())).reduce((a,x)=>a+dur(x),0);
+let savedAt=0;
+let st={err:'',need:false};
+function save(){const ok=B()?true:Store.save(D);st.err=ok?'':'Not saved: storage unavailable';if(ok)savedAt=now();render();
+ if(B()&&!st.need)B().write().then(()=>{st.err='';savedAt=now();FS.merged?(FS.merged=0,render()):statusRender()}).catch(()=>{st.err='Could not write data file';statusRender()})}
+function statusRender(){const s=document.getElementById('saved'),w=B()?bn():'browser cache only';s.className='pill'+(st.err?' err':'');
+ s.innerHTML=st.need?(GD.on?'Signed out of Google <button data-a="reconnect">Sign in</button>':'Data file needs permission <button data-a="reconnect">Reconnect</button>'):st.err?esc(st.err):(savedAt?'Saved '+new Date(savedAt).toLocaleTimeString()+' · '+w:'Ready · '+w)}
+
+/* ---- metrics ---- */
+function wk(ts){const d=new Date(ts);d.setHours(0,0,0,0);d.setDate(d.getDate()-((d.getDay()+6)%7));return d}
+function bucketKey(r,ts){if(r==='day')return dk(ts);if(r==='week')return dk(wk(ts));const d=new Date(ts);return d.getFullYear()+'-'+p2(d.getMonth()+1)}
+function buckets(r){const out=[],n=new Date();
+  if(r==='day')for(let i=6;i>=0;i--){const d=new Date(n.getFullYear(),n.getMonth(),n.getDate()-i);out.push({k:dk(d),l:d.toLocaleDateString(undefined,{weekday:'short'})})}
+  else if(r==='week')for(let i=7;i>=0;i--){const d=wk(n);d.setDate(d.getDate()-7*i);out.push({k:dk(d),l:d.toLocaleDateString(undefined,{day:'numeric',month:'short'})})}
+  else for(let i=5;i>=0;i--){const d=new Date(n.getFullYear(),n.getMonth()-i,1);out.push({k:d.getFullYear()+'-'+p2(d.getMonth()+1),l:d.toLocaleDateString(undefined,{month:'short'})})}
+  return out}
+function streak(t){const days=new Set(t.s.filter(x=>dur(x)>0).map(x=>dk(x.s)));
+  let d=new Date();d.setHours(12);if(!days.has(dk(d)))d.setDate(d.getDate()-1);
+  let n=0;while(days.has(dk(d))){n++;d.setDate(d.getDate()-1)}return{n,total:days.size}}
+function goalDays(t){let c=0;const n=new Date();for(let i=0;i<7;i++){const d=new Date(n.getFullYear(),n.getMonth(),n.getDate()-i),k=dk(d);
+  const ms=t.s.filter(x=>dk(x.s)===k).reduce((a,x)=>a+dur(x),0);if(t.goal&&ms>=t.goal*60000)c++}return c}
+
+/* ---- views ---- */
+function taskCard(t){
+  const run=running(t),gi=goalInfo(t),g=gi?Math.min(100,gi.done/gi.ms*100):0;
+  let h=`<article class="card ${run?'live':''}"><div class="row"><h3>${esc(t.name)}</h3><div class="clock sp" data-tt="${t.id}">${clk(todayMs(t))}</div></div>
+  <div class="bar"><i data-g="${t.id}" class="${g>=100?'done':''}" style="width:${g}%"></i></div>
+  ${t.desc?'<div class="mute">'+esc(t.desc)+'</div>':''}<div class="mute">${gi?'Goal '+t.gv+' '+(t.gu||'min/day'):'No goal set'} · clock shows today</div>
+  <div class="row" style="margin-top:10px"><button class="${run?'run':'p'}" data-a="toggle" data-id="${t.id}">${run?'Stop':'Start'}</button>
+  <button data-a="open" data-id="${t.id}">${ui.open[t.id]?'Close':'Edit times ('+t.s.length+')'}</button></div>`;
+  if(ui.open[t.id]){
+    h+=`<div class="row" style="margin-top:12px"><span class="mute">Add a past session</span><input type="datetime-local" id="as-${t.id}"><input type="datetime-local" id="ae-${t.id}"><button data-a="addses" data-id="${t.id}">Add</button></div>`;
+    let last='';
+    [...t.s].sort((a,b)=>b.s-a.s).slice(0,40).forEach(x=>{
+      const k=dk(x.s);if(k!==last){last=k;const tot=t.s.filter(y=>dk(y.s)===k).reduce((a,y)=>a+dur(y),0);
+        h+=`<div class="day">${new Date(x.s).toLocaleDateString(undefined,{weekday:'short',day:'numeric',month:'short'})} <span class="mute">· ${hm(tot)}</span></div>`}
+      if(ui.edit===x.id)h+=`<div class="ses"><input type="datetime-local" id="es" value="${loc(x.s)}"><input type="datetime-local" id="ee" value="${x.e?loc(x.e):''}"><button class="p" data-a="saveses" data-id="${t.id}" data-sid="${x.id}">Save</button><button data-a="canceledit">Cancel</button></div>`;
+      else h+=`<div class="ses"><span>${tm(x.s)} – ${x.e?tm(x.e):'running'}</span><span class="mute">${x.e?hm(dur(x)):''}</span><span class="sp"></span><button data-a="editses" data-sid="${x.id}">Edit</button><button class="g" data-a="delses" data-id="${t.id}" data-sid="${x.id}">Delete</button></div>`});
+  }
+  return h+'</article>'}
+
+function lineSvg(bs,tot,max){const W=320,H=150,px=i=>20+i*(W-40)/Math.max(1,bs.length-1),py=v=>H-28-(v/max)*(H-56);
+ const pts=bs.map((b,i)=>px(i)+','+py(tot[b.k])).join(' ');
+ return `<svg viewBox="0 0 ${W} ${H}" width="100%" role="img" aria-label="Line chart of time spent" style="display:block;margin-top:8px"><line x1="10" x2="${W-10}" y1="${H-28}" y2="${H-28}" stroke="var(--line)"/><polyline points="${pts}" fill="none" stroke="var(--acc)" stroke-width="2.5" stroke-linejoin="round"/>${bs.map((b,i)=>`<circle cx="${px(i)}" cy="${py(tot[b.k])}" r="3.5" fill="var(--acc)"/><text x="${px(i)}" y="${py(tot[b.k])-8}" text-anchor="middle" font-size="9" fill="var(--ink)">${tot[b.k]?hm(tot[b.k]):''}</text><text x="${px(i)}" y="${H-10}" text-anchor="middle" font-size="9" fill="var(--mute)">${b.l}</text>`).join('')}</svg>`}
+function goalStat(t){const g=goalInfo(t);if(!g)return['–','no goal set'];let c=0;const n=new Date(),sum=k=>0;
+ if(!g.w){for(let i=0;i<7;i++){const k=dk(new Date(n.getFullYear(),n.getMonth(),n.getDate()-i));if(t.s.filter(x=>dk(x.s)===k).reduce((a,x)=>a+dur(x),0)>=g.ms)c++}return[c+'/7','goal met, last 7 days']}
+ for(let i=0;i<4;i++){const d=wk(n);d.setDate(d.getDate()-7*i);const k=dk(d);if(t.s.filter(x=>dk(wk(x.s))===k).reduce((a,x)=>a+dur(x),0)>=g.ms)c++}return[c+'/4','goal met, last 4 weeks']}
+function metrics(ts){
+  const r=ui.range,bs=buckets(r),tot={};bs.forEach(b=>tot[b.k]=0);
+  const per=ts.map(t=>{let m=0;t.s.forEach(x=>{const k=bucketKey(r,x.s);if(k in tot){tot[k]+=dur(x);m+=dur(x)}});return{t,m}});
+  const max=Math.max(1,...Object.values(tot)),all=Object.values(tot).reduce((a,b)=>a+b,0),pmax=Math.max(1,...per.map(p=>p.m));
+  const unit={day:'last 7 days',week:'last 8 weeks',month:'last 6 months'}[r];
+  return `<div class="card"><div class="row"><div class="seg">${['day','week','month'].map(x=>`<button data-a="range" data-r="${x}" class="${r===x?'on':''}">${x[0].toUpperCase()+x.slice(1)}</button>`).join('')}</div><button class="g sp" data-a="chart" aria-label="Switch between bar and line chart" title="Bar / line">${ui.chart==='line'?'▥':'⌇'}</button><span class="mute">${unit}: <strong>${hm(all)}</strong></span></div>
+  ${ui.chart==='line'?lineSvg(bs,tot,max):''}<div class="chart" style="display:${ui.chart==='line'?'none':'flex'}">${bs.map(b=>`<div class="col"><em>${tot[b.k]?hm(tot[b.k]):''}</em><b style="height:${tot[b.k]/max*100*.78}%"></b><span>${b.l}</span></div>`).join('')}</div></div>
+  <div class="card"><h3>By task · ${unit}</h3>${per.map(p=>`<div style="margin-top:10px"><div class="row"><span>${esc(p.t.name)}</span><span class="sp mute">${hm(p.m)}</span></div><div class="hb" style="width:${p.m/pmax*100}%"></div></div>`).join('')}</div>
+  <div class="card"><h3>Streaks and goals</h3>${ts.map(t=>{const s=streak(t),gs=goalStat(t);return `<div style="margin-top:10px"><strong>${esc(t.name)}</strong><div class="stats"><div><strong>${s.n}</strong><span class="mute">day streak</span></div><div><strong>${s.total}</strong><span class="mute">days practiced</span></div><div><strong>${gs[0]}</strong><span class="mute">${gs[1]}</span></div></div></div>`}).join('')}</div>`}
+
+function dash(){const d=cur();if(!d)return '<div class="empty">No dashboards yet. Create one in Settings.</div>';
+  const ts=d.tasks.map(task).filter(Boolean);
+  if(!ts.length)return '<div class="empty">This dashboard has no tasks. Add tasks to it in Settings.</div>';
+  return (d.desc?'<p class="mute">'+esc(d.desc)+'</p>':'')+ts.map(taskCard).join('')+'<h2>Metrics</h2>'+metrics(ts)}
+
+function settings(){
+  return `<h2>Tasks</h2>`+D.tasks.map(t=>`<div class="card row"><input data-c="tname" data-id="${t.id}" value="${esc(t.name)}" aria-label="Task name"><input data-c="tgoal" data-id="${t.id}" type="number" min="0" step="any" value="${t.gv||0}" style="width:80px" aria-label="Goal amount">${guSel(t.gu,'data-c="tunit" data-id="'+t.id+'"')}<input data-c="tdesc" data-id="${t.id}" value="${esc(t.desc||'')}" placeholder="Description" style="flex:1 1 200px"><button class="g sp" data-a="deltask" data-id="${t.id}">Delete</button></div>`).join('')+
+  `<div class="card row"><input id="nt" placeholder="New task name"><input id="ng" type="number" min="0" step="any" placeholder="Goal" style="width:80px">${guSel('min/day','id="ngu"')}<input id="ndesc" placeholder="Description (optional)" style="flex:1 1 180px"><button class="p" data-a="addtask">Add task</button></div>
+  <h2>Dashboards</h2>`+D.dashes.map(d=>`<div class="card"><div class="row"><input data-c="dname" data-id="${d.id}" value="${esc(d.name)}" aria-label="Dashboard name"><input data-c="ddesc" data-id="${d.id}" value="${esc(d.desc||'')}" placeholder="Description" style="flex:1 1 200px"><button class="g sp" data-a="deldash" data-id="${d.id}">Delete</button></div><div style="margin-top:8px">${D.tasks.map(t=>`<label class="chk"><input type="checkbox" data-c="assign" data-id="${d.id}" data-t="${t.id}" ${d.tasks.includes(t.id)?'checked':''}>${esc(t.name)}</label>`).join('')||'<span class="mute">Add tasks first.</span>'}</div></div>`).join('')+
+  `<div class="card row"><input id="nd" placeholder="New dashboard name"><input id="nd2" placeholder="Description (optional)" style="flex:1 1 180px"><button class="p" data-a="adddash">Add dashboard</button></div>
+  <h2>Data</h2><div class="card"><div class="row" style="margin-bottom:10px"><input data-c="cid" value="${esc(GD.cid)}" placeholder="Google OAuth client ID (ends in .apps.googleusercontent.com)" style="flex:1 1 280px" aria-label="Google client ID"></div><p class="mute" style="margin-top:0">${B()?'Source of truth: <strong>'+esc(bn())+'</strong>. Every change is written to this file, and changes made in another browser appear here within a few seconds.':'No data file linked. Connect Google Drive (works in every browser)'+(FS.ok?', or link a local JSON file.':'.')}</p><div class="row"><button class="p" data-a="gdconnect">${GD.on?'Reconnect Google Drive':'Connect Google Drive'}</button>${FS.ok?FB:''}${B()?'<button class="g" data-a="unlink">Unlink</button>':''}<button data-a="export">Export JSON</button><label class="mute">Import: <input type="file" id="imp" accept=".json,application/json" data-c="import"></label></div></div>`}
+
+function render(){
+  const sel=document.getElementById('dsel');
+  sel.innerHTML=D.dashes.map(d=>`<option value="${d.id}" ${d.id===D.cur?'selected':''}>${esc(d.name)}</option>`).join('');
+  sel.style.display=ui.tab==='dash'?'':'none';
+  document.getElementById('tabbtn').textContent=ui.tab==='dash'?'Settings':'Back to dashboard';
+  const keep=document.activeElement&&document.activeElement.id;
+  document.getElementById('app').innerHTML=ui.boot?'<div class="empty">Loading</div>':(B()&&st.need&&!GD.ready)?lock():(ui.tab==='dash'?banner()+dash():settings());
+  statusRender();
+}
+setInterval(()=>{document.querySelectorAll('[data-tt]').forEach(e=>{const t=task(e.dataset.tt);if(t)e.textContent=clk(todayMs(t))});
+  document.querySelectorAll('[data-g]').forEach(e=>{const t=task(e.dataset.g),gi=t&&goalInfo(t);if(gi){const g=Math.min(100,gi.done/gi.ms*100);e.style.width=g+'%';e.classList.toggle('done',g>=100)}})},1000);
+
+/* ---- actions ---- */
+const $v=id=>{const e=document.getElementById(id);return e?e.value:''};
+const A={
+ tab(){ui.tab=ui.tab==='dash'?'set':'dash';render()},
+ chart(){ui.chart=ui.chart==='line'?'bar':'line';render()},
+ async mkfile(){try{FS.h=await showSaveFilePicker({suggestedName:'session-ledger-data.json',...FT});await FS.put(FS.h).catch(()=>{});GD.on=false;LS.set('sl-mode',null);st.need=false;save()}catch(e){st.err=e.name==='AbortError'?'':'File access is not available in this view';render()}},
+ async openfile(){try{const[h]=await showOpenFilePicker(FT);FS.h=h;await FS.put(h).catch(()=>{});GD.on=false;LS.set('sl-mode',null);st.need=false;if(!await FS.load()){FS.h=null;st.err='Not a Session Ledger data file';render();return}st.err='';save()}catch(e){st.err=e.name==='AbortError'?'':'Could not use that file';render()}},
+ async reconnect(){if(GD.on){try{await GD.auth(true);st.need=false;st.err='';if(GD.ready)await GD.write();else{await GD.load();GD.ready=true}}catch(e){st.err=e.message}render();return}try{if(await FS.h.requestPermission({mode:'readwrite'})==='granted'){st.need=false;st.err='';await FS.load();render()}}catch(e){st.err='Could not read data file';render()}},
+ async gdconnect(){if(!GD.cid){ui.tab='set';st.err='Add your Google client ID first';render();return}GD.on=true;LS.set('sl-mode','drive');GD.fid=null;LS.set('sl-fid',null);try{await GD.auth(true);await GD.load();GD.ready=true;st.err='';st.need=false}catch(e){GD.on=false;LS.set('sl-mode',null);st.err=e.message}render()},
+ unlink(){GD.on=false;GD.ready=false;LS.set('sl-mode',null);FS.h=null;FS.db().then(db=>db.transaction('k','readwrite').objectStore('k').delete('h')).catch(()=>{});Store.save(D);st.need=false;render()},
+ theme(){const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme:dark)').matches;r.dataset.theme=dark?'light':'dark'},
+ toggle(e){const t=task(e.dataset.id),r=running(t);if(r)r.e=now();else t.s.push({id:uid(),s:now(),e:null});save()},
+ open(e){ui.open[e.dataset.id]=!ui.open[e.dataset.id];render()},
+ range(e){ui.range=e.dataset.r;render()},
+ editses(e){ui.edit=e.dataset.sid;render()},
+ canceledit(){ui.edit=null;render()},
+ saveses(e){const x=task(e.dataset.id).s.find(y=>y.id===e.dataset.sid),s=new Date($v('es')).getTime(),ev=$v('ee'),n=ev?new Date(ev).getTime():0;
+   if(s&&((n&&n>s)||(!ev&&!x.e))){x.s=s;x.e=n||null;ui.edit=null;save()}else alert('Enter a start and an end time, with the end after the start.')},
+ delses(e){const t=task(e.dataset.id);t.s=t.s.filter(y=>y.id!==e.dataset.sid);save()},
+ addses(e){const id=e.dataset.id,s=new Date($v('as-'+id)).getTime(),n=new Date($v('ae-'+id)).getTime();
+   if(s&&n&&n>s){task(id).s.push({id:uid(),s,e:n});save()}else alert('Enter a start and an end time, with the end after the start.')},
+ addtask(){const n=$v('nt').trim();if(!n)return;D.tasks.push({id:uid(),name:n,gv:+$v('ng')||0,gu:$v('ngu')||'min/day',desc:$v('ndesc').trim(),s:[]});save()},
+ deltask(e){if(!confirm('Delete this task and all its sessions?'))return;D.tasks=D.tasks.filter(t=>t.id!==e.dataset.id);D.dashes.forEach(d=>d.tasks=d.tasks.filter(i=>i!==e.dataset.id));save()},
+ adddash(){const n=$v('nd').trim();if(!n)return;const d={id:uid(),name:n,desc:$v('nd2').trim(),tasks:[]};D.dashes.push(d);if(!D.cur)D.cur=d.id;save()},
+ deldash(e){if(!confirm('Delete this dashboard? Its tasks are kept.'))return;D.dashes=D.dashes.filter(d=>d.id!==e.dataset.id);if(D.cur===e.dataset.id)D.cur=(D.dashes[0]||{}).id;save()},
+ export(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,1)],{type:'application/json'}));a.download='session-ledger-'+dk(now())+'.json';a.click()}
+};
+const C={
+ cur(e){D.cur=e.value;save()},
+ tname(e){task(e.dataset.id).name=e.value.trim()||'Untitled';save()},
+ cid(e){GD.cid=e.value.trim();LS.set('sl-cid',GD.cid||null);render()},
+ tgoal(e){task(e.dataset.id).gv=Math.max(0,+e.value||0);save()},
+ tunit(e){task(e.dataset.id).gu=e.value;save()},
+ tdesc(e){task(e.dataset.id).desc=e.value.trim();save()},
+ ddesc(e){D.dashes.find(d=>d.id===e.dataset.id).desc=e.value.trim();save()},
+ dname(e){D.dashes.find(d=>d.id===e.dataset.id).name=e.value.trim()||'Untitled';save()},
+ assign(e){const d=D.dashes.find(x=>x.id===e.dataset.id);d.tasks=d.tasks.filter(i=>i!==e.dataset.t);if(e.checked)d.tasks.push(e.dataset.t);save()},
+ import(e){const f=e.files[0];if(!f)return;if(!confirm('Replace all current data with this file?')){e.value='';return}const r=new FileReader();r.onload=()=>{try{const j=JSON.parse(r.result);if(!j.tasks||!j.dashes)throw 0;D=j;migrate();save()}catch(x){alert('That file is not a valid Session Ledger export.')}};r.readAsText(f)}
+};
+(async()=>{try{if(GD.on){st.need=true;GD.lib().catch(()=>{})}else if(FS.ok){const h=await FS.get();if(h){FS.h=h;if(await h.queryPermission({mode:'readwrite'})==='granted')await FS.load();else st.need=true}}}catch(e){}ui.boot=false;render()})();
+setInterval(pull,4000);addEventListener('focus',pull);document.addEventListener('visibilitychange',pull);
+document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-a]');if(!b||!A[b.dataset.a])return;if(st.need&&B()&&!['reconnect','unlink','gdconnect'].includes(b.dataset.a)){await A.reconnect();if(st.need)return}A[b.dataset.a](b)});
+document.addEventListener('change',ev=>{const b=ev.target.closest('[data-c]');if(b&&C[b.dataset.c])C[b.dataset.c](b)});
+render();
+</script>
+</body>
+</html>
