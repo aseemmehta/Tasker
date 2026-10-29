@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta http-equiv="Content-Security-Policy" content="script-src 'unsafe-inline' https://accounts.google.com/gsi/client; object-src 'none'; base-uri 'none'; form-action 'none'; connect-src https://www.googleapis.com https://oauth2.googleapis.com https://accounts.google.com/gsi/; frame-src https://accounts.google.com/gsi/">
 <title>Session Ledger</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>⏱️</text></svg>">
 <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;600;700&display=swap" rel="stylesheet">
@@ -50,7 +51,7 @@ select,input{border:1px solid var(--line);background:var(--card);border-radius:8
 .hb{height:10px;background:var(--acc);border-radius:5px;min-width:2px}
 .chk{display:inline-flex;gap:4px;align-items:center;margin-right:10px}
 .chk input{min-height:auto}
-.empty{text-align:center;color:var(--mute);padding:28px 8px}.pill{font-size:12px;color:var(--mute);border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:var(--card)}.pill.err{color:#dc2626;border-color:#dc2626}.pill button{min-height:28px;padding:2px 8px;margin-left:6px}
+.empty{text-align:center;color:var(--mute);padding:28px 8px}.pill{font-size:12px;color:var(--mute);border:1px solid var(--line);border-radius:999px;padding:4px 10px;background:var(--card)}.pill.err{color:#dc2626;border-color:#dc2626}.pill button{min-height:28px;padding:2px 8px;margin-left:6px}.ov{position:fixed;inset:0;background:rgba(0,0,0,.5);display:flex;align-items:center;justify-content:center;padding:16px;z-index:50}.dlg{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:18px;max-width:440px;width:100%}.dlg p{margin:8px 0 0}.dlg .row{justify-content:flex-end;margin-top:16px}.danger{background:#dc2626;color:#fff;border-color:#dc2626;font-weight:600}
 </style>
 </head>
 <body>
@@ -62,27 +63,36 @@ select,input{border:1px solid var(--line);background:var(--card);border-radius:8
   <button id="tabbtn" data-a="tab"></button>
   <button class="g" data-a="theme" aria-label="Toggle theme">◐</button>
 </header>
-<div id="app"></div>
+<div id="app"></div><div id="dlg"></div>
 
 </main>
 <script>
 const uid=()=>Math.random().toString(36).slice(2,9);
-const esc=s=>String(s).replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc=s=>String(s).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
 /* Storage layer: swap this object for a Google Drive / iCloud backend later. */
 const Store={key:'session-ledger.v1',
   load(){try{return JSON.parse(localStorage.getItem(this.key))}catch(e){return null}},
   save(d){try{localStorage.setItem(this.key,JSON.stringify(d));return true}catch(e){return false}}};
-function seed(){const a=uid(),b=uid(),d=uid();return{v:1,cur:d,tasks:[{id:a,name:'LeetCode',goal:90,s:[]},{id:b,name:'Reading',goal:30,s:[]}],dashes:[{id:d,name:'Daily practice',tasks:[a,b]}]}}
-let D=Store.load()||seed();migrate();
-function migrate(){D.tasks.forEach(t=>{if(t.gv===undefined){t.gv=t.goal||0;t.gu='min/day'}t.desc=t.desc||''});D.dashes.forEach(d=>d.desc=d.desc||'')}
+function seed(){const d=uid();return{v:1,cur:d,tasks:[],dashes:[{id:d,name:'My dashboard',desc:'',tasks:[]}]}}
 const GU=['min/day','hour/day','min/week','hour/week'];
+/* Every load path (file, Drive, import, cache) runs through clean(): unexpected shapes, ids and numbers are dropped, so a tampered file cannot inject markup. */
+const OK=s=>typeof s==='string'&&/^[A-Za-z0-9_-]{1,40}$/.test(s),TX=(s,n)=>typeof s==='string'?s.slice(0,n):'',NM=n=>Number.isFinite(n)?n:0;
+function clean(j){if(!j||!Array.isArray(j.tasks)||!Array.isArray(j.dashes))return null;
+ const tasks=j.tasks.filter(t=>t&&OK(t.id)).map(t=>({id:t.id,name:TX(t.name,100)||'Untitled',desc:TX(t.desc,500),gv:Math.max(0,NM(+(t.gv!==undefined?t.gv:t.goal))),gu:GU.includes(t.gu)?t.gu:'min/day',arch:!!t.arch,
+  s:(Array.isArray(t.s)?t.s:[]).filter(x=>x&&OK(x.id)&&Number.isFinite(x.s)&&(x.e==null||Number.isFinite(x.e))).map(x=>({id:x.id,s:x.s,e:x.e==null?null:x.e}))}));
+ const ids=new Set(tasks.map(t=>t.id));
+ const dashes=j.dashes.filter(d=>d&&OK(d.id)).map(d=>({id:d.id,name:TX(d.name,100)||'Untitled',desc:TX(d.desc,500),tasks:(Array.isArray(d.tasks)?d.tasks:[]).filter(i=>ids.has(i))}));
+ return{v:1,cur:dashes.some(d=>d.id===j.cur)?j.cur:(dashes[0]||{}).id,tasks,dashes}}
+let D=Store.load()||seed();migrate();
+function migrate(){D=clean(D)||seed()}
+
 const guSel=(v,a)=>`<select ${a} aria-label="Goal unit">${GU.map(u=>`<option ${u===(v||'min/day')?'selected':''}>${u}</option>`).join('')}</select>`;
 /* Optional file backend: a data file inside your synced Drive folder (desktop Chrome/Edge). */
 const FS={ok:'showSaveFilePicker' in window,h:null,q:null,
  db(){return new Promise((r,j)=>{const q=indexedDB.open('sl',1);q.onupgradeneeded=()=>q.result.createObjectStore('k');q.onsuccess=()=>r(q.result);q.onerror=j})},
  async put(h){(await this.db()).transaction('k','readwrite').objectStore('k').put(h,'h')},
  async get(){const db=await this.db();return new Promise(r=>{const q=db.transaction('k').objectStore('k').get('h');q.onsuccess=()=>r(q.result);q.onerror=()=>r(null)})},
- async load(){const f=await this.h.getFile(),j=JSON.parse(await f.text());if(!j.tasks||!j.dashes)return false;D=j;migrate();this.seen=f.lastModified;return true},
+ async load(){const f=await this.h.getFile(),j=JSON.parse(await f.text());const c=clean(j);if(!c)return false;D=c;this.seen=f.lastModified;return true},
  write(){this.q=(this.q||Promise.resolve()).catch(()=>{}).then(async()=>{this.busy=1;try{const f=await this.h.getFile();if(this.seen&&f.lastModified!==this.seen){try{merge(JSON.parse(await f.text()));this.merged=1}catch(e){}}const w=await this.h.createWritable();await w.write(JSON.stringify(D,null,1));await w.close();this.seen=(await this.h.getFile()).lastModified}finally{this.busy=0}});return this.q}};
 const FT={types:[{description:'JSON',accept:{'application/json':['.json']}}]};
 const FB='<button class="p" data-a="mkfile">Create new data file</button><button data-a="openfile">Use existing data file</button>';
@@ -101,17 +111,23 @@ const GD={cid:LS.get('sl-cid')||CLIENT_ID,on:LS.get('sl-mode')==='drive',fid:LS.
   const r=await(await this.api(`${UP}?uploadType=multipart&fields=id,modifiedTime`,{method:'POST',headers:{'Content-Type':'multipart/related; boundary='+b},body})).json();this.fid=r.id;LS.set('sl-fid',r.id);this.seen=r.modifiedTime},
  async load(){if(this.fid){try{await this.meta()}catch(e){if(st.need)throw e;this.fid=null}}
   if(!this.fid){const r=await(await this.api(`${API}?q=${encodeURIComponent(`name='session-ledger-data.json' and trashed=false`)}&fields=files(id)`)).json();if(r.files[0]){this.fid=r.files[0].id;LS.set('sl-fid',this.fid)}}
-  if(this.fid){const j=await this.read();if(j.tasks&&j.dashes){D=j;migrate()}this.seen=await this.meta()}else await this.create()},
+  if(this.fid){const c=clean(await this.read());if(c)D=c;this.seen=await this.meta()}else await this.create()},
  write(){this.q=(this.q||Promise.resolve()).catch(()=>{}).then(async()=>{this.busy=1;try{const m=await this.meta();if(this.seen&&m!==this.seen){merge(await this.read());FS.merged=1}
   const r=await(await this.api(`${UP}/${this.fid}?uploadType=media&fields=modifiedTime`,{method:'PATCH',headers:{'Content-Type':'application/json'},body:JSON.stringify(D)})).json();this.seen=r.modifiedTime}finally{this.busy=0}});return this.q},
- async pull(){const m=await this.meta();if(m===this.seen)return false;const j=await this.read();if(j.tasks&&j.dashes){D=j;migrate();this.seen=m;return true}return false}};
+ async pull(){const m=await this.meta();if(m===this.seen)return false;const c=clean(await this.read());if(c){D=c;this.seen=m;return true}return false}};
 const B=()=>GD.on?GD:FS.h?FS:null,bn=()=>GD.on?'Google Drive':FS.h.name;
 /* Another browser wrote the file between our read and write: keep our changes, add anything we have not seen. */
-function merge(R){if(!R.tasks||!R.dashes)return;R.tasks.forEach(rt=>{const t=task(rt.id);if(!t)D.tasks.push(rt);else rt.s.forEach(x=>{const y=t.s.find(z=>z.id===x.id);if(!y)t.s.push(x);else if(!y.e&&x.e)y.e=x.e})});R.dashes.forEach(rd=>{if(!D.dashes.find(d=>d.id===rd.id))D.dashes.push(rd)})}
+function merge(R){R=clean(R);if(!R)return;R.tasks.forEach(rt=>{const t=task(rt.id);if(!t)D.tasks.push(rt);else rt.s.forEach(x=>{const y=t.s.find(z=>z.id===x.id);if(!y)t.s.push(x);else if(!y.e&&x.e)y.e=x.e})});R.dashes.forEach(rd=>{if(!D.dashes.find(d=>d.id===rd.id))D.dashes.push(rd)})}
 /* Pick up changes made through another browser. */
 async function pull(){if(!B()||st.need||ui.boot||B().busy)return;const a=document.activeElement;if(a&&/INPUT|SELECT|TEXTAREA/.test(a.tagName))return;
- try{if(GD.on){if(await GD.pull()){savedAt=now();render()}return}const f=await FS.h.getFile();if(f.lastModified===FS.seen)return;const j=JSON.parse(await f.text());if(j.tasks&&j.dashes){D=j;migrate();FS.seen=f.lastModified;savedAt=now();render()}}catch(e){}}
+ try{if(GD.on){if(await GD.pull()){savedAt=now();render()}return}const f=await FS.h.getFile();if(f.lastModified===FS.seen)return;const c=clean(JSON.parse(await f.text()));if(c){D=c;FS.seen=f.lastModified;savedAt=now();render()}}catch(e){}}
 function banner(){if(B())return'';return `<div class="card"><strong>Data is only in this browser's cache.</strong><p class="mute">Connect Google Drive so one JSON file is the source of truth on every device and browser.</p><div class="row"><button class="p" data-a="gdconnect">Connect Google Drive</button>${FS.ok?'<button data-a="mkfile">Use a local file instead</button>':''}</div></div>`}
+function dlgRender(){const e=document.getElementById('dlg'),d=ui.dlg;if(!d){e.innerHTML='';return}
+ e.innerHTML=`<div class="ov"><div class="dlg" role="alertdialog" aria-modal="true" aria-labelledby="dt"><h3 id="dt">${esc(d.title)}</h3><p>${esc(d.msg)}</p><div class="row"><button data-a="dlgno">Cancel</button>${d.alt?`<button data-a="dlgalt">${esc(d.alt)}</button>`:''}<button class="danger" data-a="dlgyes">${esc(d.yes)}</button></div></div></div>`;e.querySelector('[data-a=dlgno]').focus()}
+function welcome(){const stor=B()?`<p class="mute">Storage: <strong>${esc(bn())}</strong>.</p>`
+ :`<p>Choose where your data is saved:</p><div class="row"><button class="p" data-a="gdconnect">Connect Google Drive</button>${FS.ok?'<button data-a="mkfile">Create local JSON file</button><button data-a="openfile">Use existing JSON file</button>':''}</div><p class="mute">Google Drive works in every browser and on phones. Local JSON files only work in Chrome and Edge.${FS.ok?'':' This browser does not support them.'}</p>`;
+ return `<div class="card"><h3>Welcome to Session Ledger</h3><p class="mute">Track the time you spend on repeatable tasks. Start and stop as often as you like, fix times when something goes wrong, and see your totals, streaks and goals.</p>${stor}<p class="mute">Next, open <strong>Settings</strong> (top right) and add your tasks. Give each task an optional daily or weekly goal, and group tasks into dashboards there.</p><div class="row"><button class="p" data-a="tab">Open Settings</button></div></div>`}
+function archList(){const a=D.tasks.filter(t=>t.arch);if(!a.length)return'';return '<h2>Archived tasks</h2>'+a.map(t=>`<div class="card row"><span>${esc(t.name)}</span><span class="mute">${t.s.length} sessions, ${hm(t.s.reduce((n,x)=>n+dur(x),0))}</span><button class="sp" data-a="archive" data-id="${t.id}">Restore</button><button class="g" data-a="deltask" data-id="${t.id}">Delete</button></div>`).join('')}
 function lock(){return `<div class="card"><strong>Data: ${esc(bn())}</strong><p class="mute">Your data lives there. ${GD.on?'Sign in to Google':'Allow access'} so it can be loaded.</p><div class="row"><button class="p" data-a="reconnect">Continue</button></div></div>`}
 const goalInfo=t=>{if(!t.gv)return null;const u=t.gu||'min/day',w=u.endsWith('week'),ms=t.gv*(u.startsWith('hour')?3600000:60000);return{ms,w,done:w?weekMs(t):todayMs(t)}};
 const weekMs=t=>{const k=dk(wk(now()));return t.s.filter(x=>dk(wk(x.s))===k).reduce((a,x)=>a+dur(x),0)};
@@ -185,14 +201,14 @@ function metrics(ts){
   <div class="card"><h3>Streaks and goals</h3>${ts.map(t=>{const s=streak(t),gs=goalStat(t);return `<div style="margin-top:10px"><strong>${esc(t.name)}</strong><div class="stats"><div><strong>${s.n}</strong><span class="mute">day streak</span></div><div><strong>${s.total}</strong><span class="mute">days practiced</span></div><div><strong>${gs[0]}</strong><span class="mute">${gs[1]}</span></div></div></div>`}).join('')}</div>`}
 
 function dash(){const d=cur();if(!d)return '<div class="empty">No dashboards yet. Create one in Settings.</div>';
-  const ts=d.tasks.map(task).filter(Boolean);
+  const ts=d.tasks.map(task).filter(t=>t&&!t.arch);
   if(!ts.length)return '<div class="empty">This dashboard has no tasks. Add tasks to it in Settings.</div>';
   return (d.desc?'<p class="mute">'+esc(d.desc)+'</p>':'')+ts.map(taskCard).join('')+'<h2>Metrics</h2>'+metrics(ts)}
 
 function settings(){
-  return `<h2>Tasks</h2>`+D.tasks.map(t=>`<div class="card row"><input data-c="tname" data-id="${t.id}" value="${esc(t.name)}" aria-label="Task name"><input data-c="tgoal" data-id="${t.id}" type="number" min="0" step="any" value="${t.gv||0}" style="width:80px" aria-label="Goal amount">${guSel(t.gu,'data-c="tunit" data-id="'+t.id+'"')}<input data-c="tdesc" data-id="${t.id}" value="${esc(t.desc||'')}" placeholder="Description" style="flex:1 1 200px"><button class="g sp" data-a="deltask" data-id="${t.id}">Delete</button></div>`).join('')+
+  return `<h2>Tasks</h2>`+D.tasks.filter(t=>!t.arch).map(t=>`<div class="card row"><input data-c="tname" data-id="${t.id}" value="${esc(t.name)}" aria-label="Task name"><input data-c="tgoal" data-id="${t.id}" type="number" min="0" step="any" value="${t.gv||0}" style="width:80px" aria-label="Goal amount">${guSel(t.gu,'data-c="tunit" data-id="'+t.id+'"')}<input data-c="tdesc" data-id="${t.id}" value="${esc(t.desc||'')}" placeholder="Description" style="flex:1 1 200px"><button class="g sp" data-a="archive" data-id="${t.id}">Archive</button><button class="g" data-a="deltask" data-id="${t.id}">Delete</button></div>`).join('')+
   `<div class="card row"><input id="nt" placeholder="New task name"><input id="ng" type="number" min="0" step="any" placeholder="Goal" style="width:80px">${guSel('min/day','id="ngu"')}<input id="ndesc" placeholder="Description (optional)" style="flex:1 1 180px"><button class="p" data-a="addtask">Add task</button></div>
-  <h2>Dashboards</h2>`+D.dashes.map(d=>`<div class="card"><div class="row"><input data-c="dname" data-id="${d.id}" value="${esc(d.name)}" aria-label="Dashboard name"><input data-c="ddesc" data-id="${d.id}" value="${esc(d.desc||'')}" placeholder="Description" style="flex:1 1 200px"><button class="g sp" data-a="deldash" data-id="${d.id}">Delete</button></div><div style="margin-top:8px">${D.tasks.map(t=>`<label class="chk"><input type="checkbox" data-c="assign" data-id="${d.id}" data-t="${t.id}" ${d.tasks.includes(t.id)?'checked':''}>${esc(t.name)}</label>`).join('')||'<span class="mute">Add tasks first.</span>'}</div></div>`).join('')+
+  ${archList()}<h2>Dashboards</h2>`+D.dashes.map(d=>`<div class="card"><div class="row"><input data-c="dname" data-id="${d.id}" value="${esc(d.name)}" aria-label="Dashboard name"><input data-c="ddesc" data-id="${d.id}" value="${esc(d.desc||'')}" placeholder="Description" style="flex:1 1 200px"><button class="g sp" data-a="deldash" data-id="${d.id}">Delete</button></div><div style="margin-top:8px">${D.tasks.filter(t=>!t.arch).map(t=>`<label class="chk"><input type="checkbox" data-c="assign" data-id="${d.id}" data-t="${t.id}" ${d.tasks.includes(t.id)?'checked':''}>${esc(t.name)}</label>`).join('')||'<span class="mute">Add tasks first.</span>'}</div></div>`).join('')+
   `<div class="card row"><input id="nd" placeholder="New dashboard name"><input id="nd2" placeholder="Description (optional)" style="flex:1 1 180px"><button class="p" data-a="adddash">Add dashboard</button></div>
   <h2>Data</h2><div class="card"><div class="row" style="margin-bottom:10px"><input data-c="cid" value="${esc(GD.cid)}" placeholder="Google OAuth client ID (ends in .apps.googleusercontent.com)" style="flex:1 1 280px" aria-label="Google client ID"></div><p class="mute" style="margin-top:0">${B()?'Source of truth: <strong>'+esc(bn())+'</strong>. Every change is written to this file, and changes made in another browser appear here within a few seconds.':'No data file linked. Connect Google Drive (works in every browser)'+(FS.ok?', or link a local JSON file.':'.')}</p><div class="row"><button class="p" data-a="gdconnect">${GD.on?'Reconnect Google Drive':'Connect Google Drive'}</button>${FS.ok?FB:''}${B()?'<button class="g" data-a="unlink">Unlink</button>':''}<button data-a="export">Export JSON</button><label class="mute">Import: <input type="file" id="imp" accept=".json,application/json" data-c="import"></label></div></div>`}
 
@@ -201,8 +217,8 @@ function render(){
   sel.innerHTML=D.dashes.map(d=>`<option value="${d.id}" ${d.id===D.cur?'selected':''}>${esc(d.name)}</option>`).join('');
   sel.style.display=ui.tab==='dash'?'':'none';
   document.getElementById('tabbtn').textContent=ui.tab==='dash'?'Settings':'Back to dashboard';
-  const keep=document.activeElement&&document.activeElement.id;
-  document.getElementById('app').innerHTML=ui.boot?'<div class="empty">Loading</div>':(B()&&st.need&&!GD.ready)?lock():(ui.tab==='dash'?banner()+dash():settings());
+  dlgRender();const keep=document.activeElement&&document.activeElement.id;
+  document.getElementById('app').innerHTML=ui.boot?'<div class="empty">Loading</div>':(B()&&st.need&&!GD.ready)?lock():(ui.tab==='dash'?(D.tasks.length?banner()+dash():welcome()):settings());
   statusRender();
 }
 setInterval(()=>{document.querySelectorAll('[data-tt]').forEach(e=>{const t=task(e.dataset.tt);if(t)e.textContent=clk(todayMs(t))});
@@ -213,11 +229,12 @@ const $v=id=>{const e=document.getElementById(id);return e?e.value:''};
 const A={
  tab(){ui.tab=ui.tab==='dash'?'set':'dash';render()},
  chart(){ui.chart=ui.chart==='line'?'bar':'line';render()},
+ archive(e){const t=task(e.dataset.id);t.arch=!t.arch;if(t.arch){const r=running(t);if(r)r.e=now()}save()},
  async mkfile(){try{FS.h=await showSaveFilePicker({suggestedName:'session-ledger-data.json',...FT});await FS.put(FS.h).catch(()=>{});GD.on=false;LS.set('sl-mode',null);st.need=false;save()}catch(e){st.err=e.name==='AbortError'?'':'File access is not available in this view';render()}},
  async openfile(){try{const[h]=await showOpenFilePicker(FT);FS.h=h;await FS.put(h).catch(()=>{});GD.on=false;LS.set('sl-mode',null);st.need=false;if(!await FS.load()){FS.h=null;st.err='Not a Session Ledger data file';render();return}st.err='';save()}catch(e){st.err=e.name==='AbortError'?'':'Could not use that file';render()}},
  async reconnect(){if(GD.on){try{await GD.auth(true);st.need=false;st.err='';if(GD.ready)await GD.write();else{await GD.load();GD.ready=true}}catch(e){st.err=e.message}render();return}try{if(await FS.h.requestPermission({mode:'readwrite'})==='granted'){st.need=false;st.err='';await FS.load();render()}}catch(e){st.err='Could not read data file';render()}},
  async gdconnect(){if(!GD.cid){ui.tab='set';st.err='Add your Google client ID first';render();return}GD.on=true;LS.set('sl-mode','drive');GD.fid=null;LS.set('sl-fid',null);try{await GD.auth(true);await GD.load();GD.ready=true;st.err='';st.need=false}catch(e){GD.on=false;LS.set('sl-mode',null);st.err=e.message}render()},
- unlink(){GD.on=false;GD.ready=false;LS.set('sl-mode',null);FS.h=null;FS.db().then(db=>db.transaction('k','readwrite').objectStore('k').delete('h')).catch(()=>{});Store.save(D);st.need=false;render()},
+ unlink(){if(GD.on&&GD.tok&&window.google&&google.accounts)try{google.accounts.oauth2.revoke(GD.tok)}catch(e){}GD.tok='';GD.on=false;GD.ready=false;LS.set('sl-mode',null);FS.h=null;FS.db().then(db=>db.transaction('k','readwrite').objectStore('k').delete('h')).catch(()=>{});Store.save(D);st.need=false;render()},
  theme(){const r=document.documentElement,dark=r.dataset.theme?r.dataset.theme==='dark':matchMedia('(prefers-color-scheme:dark)').matches;r.dataset.theme=dark?'light':'dark'},
  toggle(e){const t=task(e.dataset.id),r=running(t);if(r)r.e=now();else t.s.push({id:uid(),s:now(),e:null});save()},
  open(e){ui.open[e.dataset.id]=!ui.open[e.dataset.id];render()},
@@ -225,14 +242,17 @@ const A={
  editses(e){ui.edit=e.dataset.sid;render()},
  canceledit(){ui.edit=null;render()},
  saveses(e){const x=task(e.dataset.id).s.find(y=>y.id===e.dataset.sid),s=new Date($v('es')).getTime(),ev=$v('ee'),n=ev?new Date(ev).getTime():0;
-   if(s&&((n&&n>s)||(!ev&&!x.e))){x.s=s;x.e=n||null;ui.edit=null;save()}else alert('Enter a start and an end time, with the end after the start.')},
+   if(s&&((n&&n>s)||(!ev&&!x.e))){x.s=s;x.e=n||null;ui.edit=null;save()}else{st.err='Enter a start and an end time, with the end after the start.';render()}},
  delses(e){const t=task(e.dataset.id);t.s=t.s.filter(y=>y.id!==e.dataset.sid);save()},
  addses(e){const id=e.dataset.id,s=new Date($v('as-'+id)).getTime(),n=new Date($v('ae-'+id)).getTime();
-   if(s&&n&&n>s){task(id).s.push({id:uid(),s,e:n});save()}else alert('Enter a start and an end time, with the end after the start.')},
+   if(s&&n&&n>s){task(id).s.push({id:uid(),s,e:n});save()}else{st.err='Enter a start and an end time, with the end after the start.';render()}},
  addtask(){const n=$v('nt').trim();if(!n)return;D.tasks.push({id:uid(),name:n,gv:+$v('ng')||0,gu:$v('ngu')||'min/day',desc:$v('ndesc').trim(),s:[]});save()},
- deltask(e){if(!confirm('Delete this task and all its sessions?'))return;D.tasks=D.tasks.filter(t=>t.id!==e.dataset.id);D.dashes.forEach(d=>d.tasks=d.tasks.filter(i=>i!==e.dataset.id));save()},
+ deltask(e){const t=task(e.dataset.id);ui.dlg={title:'Delete "'+t.name+'"?',msg:'This permanently deletes the task and all '+t.s.length+' recorded sessions. It cannot be undone. Archiving keeps the history and only hides the task.',yes:'Delete anyway',alt:t.arch?'':'Archive instead',altFn:()=>A.archive({dataset:{id:t.id}}),fn:()=>{D.tasks=D.tasks.filter(x=>x.id!==t.id);D.dashes.forEach(d=>d.tasks=d.tasks.filter(i=>i!==t.id))}};render()},
+ dlgno(){ui.dlg=null;render()},
+ dlgyes(){const f=ui.dlg.fn;ui.dlg=null;f();save()},
+ dlgalt(){const f=ui.dlg.altFn;ui.dlg=null;f()},
  adddash(){const n=$v('nd').trim();if(!n)return;const d={id:uid(),name:n,desc:$v('nd2').trim(),tasks:[]};D.dashes.push(d);if(!D.cur)D.cur=d.id;save()},
- deldash(e){if(!confirm('Delete this dashboard? Its tasks are kept.'))return;D.dashes=D.dashes.filter(d=>d.id!==e.dataset.id);if(D.cur===e.dataset.id)D.cur=(D.dashes[0]||{}).id;save()},
+ deldash(e){const d=D.dashes.find(x=>x.id===e.dataset.id);ui.dlg={title:'Delete "'+d.name+'"?',msg:'This permanently deletes the dashboard and cannot be undone. Dashboards cannot be archived. The tasks in it, and all their recorded time, are not deleted and stay available in Settings.',yes:'Delete anyway',fn:()=>{D.dashes=D.dashes.filter(x=>x.id!==d.id);if(D.cur===d.id)D.cur=(D.dashes[0]||{}).id}};render()},
  export(){const a=document.createElement('a');a.href=URL.createObjectURL(new Blob([JSON.stringify(D,null,1)],{type:'application/json'}));a.download='session-ledger-'+dk(now())+'.json';a.click()}
 };
 const C={
@@ -245,10 +265,10 @@ const C={
  ddesc(e){D.dashes.find(d=>d.id===e.dataset.id).desc=e.value.trim();save()},
  dname(e){D.dashes.find(d=>d.id===e.dataset.id).name=e.value.trim()||'Untitled';save()},
  assign(e){const d=D.dashes.find(x=>x.id===e.dataset.id);d.tasks=d.tasks.filter(i=>i!==e.dataset.t);if(e.checked)d.tasks.push(e.dataset.t);save()},
- import(e){const f=e.files[0];if(!f)return;if(!confirm('Replace all current data with this file?')){e.value='';return}const r=new FileReader();r.onload=()=>{try{const j=JSON.parse(r.result);if(!j.tasks||!j.dashes)throw 0;D=j;migrate();save()}catch(x){alert('That file is not a valid Session Ledger export.')}};r.readAsText(f)}
+ import(e){const f=e.files[0];if(!f)return;if(f.size>5e6){st.err='That file is too large to be a Session Ledger export.';e.value='';render();return}const r=new FileReader();r.onload=()=>{e.value='';try{const c=clean(JSON.parse(r.result));if(!c)throw 0;ui.dlg={title:'Replace all data?',msg:'This replaces everything currently saved with the contents of '+f.name+'. It cannot be undone.',yes:'Replace everything',fn:()=>{D=c}};render()}catch(x){st.err='That file is not a valid Session Ledger export.';render()}};r.readAsText(f)}
 };
 (async()=>{try{if(GD.on){st.need=true;GD.lib().catch(()=>{})}else if(FS.ok){const h=await FS.get();if(h){FS.h=h;if(await h.queryPermission({mode:'readwrite'})==='granted')await FS.load();else st.need=true}}}catch(e){}ui.boot=false;render()})();
-setInterval(pull,4000);addEventListener('focus',pull);document.addEventListener('visibilitychange',pull);
+setInterval(pull,4000);document.addEventListener('keydown',e=>{if(e.key==='Escape'&&ui.dlg){ui.dlg=null;render()}});addEventListener('focus',pull);document.addEventListener('visibilitychange',pull);
 document.addEventListener('click',async ev=>{const b=ev.target.closest('[data-a]');if(!b||!A[b.dataset.a])return;if(st.need&&B()&&!['reconnect','unlink','gdconnect'].includes(b.dataset.a)){await A.reconnect();if(st.need)return}A[b.dataset.a](b)});
 document.addEventListener('change',ev=>{const b=ev.target.closest('[data-c]');if(b&&C[b.dataset.c])C[b.dataset.c](b)});
 render();
