@@ -87,7 +87,7 @@ const FS={ok:'showSaveFilePicker' in window,h:null,q:null,
 const FT={types:[{description:'JSON',accept:{'application/json':['.json']}}]};
 const FB='<button class="p" data-a="mkfile">Create new data file</button><button data-a="openfile">Use existing data file</button>';
 /* Google Drive backend: works in any modern browser. Needs an OAuth client ID and a page served over https. */
-const CLIENT_ID='';
+const CLIENT_ID='192648856250-c3pfrcvgsuganbogpq4nh7kctg1ejub1.apps.googleusercontent.com';
 const LS={get:k=>{try{return localStorage.getItem(k)}catch(e){return null}},set:(k,v)=>{try{v==null?localStorage.removeItem(k):localStorage.setItem(k,v)}catch(e){}}};
 const API='https://www.googleapis.com/drive/v3/files',UP='https://www.googleapis.com/upload/drive/v3/files';
 const GD={cid:LS.get('sl-cid')||CLIENT_ID,on:LS.get('sl-mode')==='drive',fid:LS.get('sl-fid'),tok:'',exp:0,seen:'',busy:0,q:null,ready:false,
