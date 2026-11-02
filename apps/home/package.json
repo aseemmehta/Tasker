@@ -1,0 +1,1 @@
+{ "name": "@tasker/home", "private": true, "type": "module", "scripts": { "dev": "vite", "build": "vite build" }, "dependencies": { "@tasker/shared": "*" } }
