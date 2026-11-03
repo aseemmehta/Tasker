@@ -7,3 +7,4 @@
 1. `npm install` (creates `package-lock.json`; commit it, CI uses `npm ci`).
 2. Put your Google OAuth client ID in `apps/time/src/config.ts` (public by design; never commit a client secret).
 3. `npm run dev:time` for local work, `npm run build` to produce `site/`.
+4. Repo Settings, Pages, Source: GitHub Actions. Push to main to deploy.
