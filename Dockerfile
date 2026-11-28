@@ -9,6 +9,11 @@ CMD ["npm", "run", "dev", "--", "--host", "0.0.0.0"]
 
 # Production build
 FROM dev AS build
+# Public build-time values, passed in by docker compose from .env (the .env file itself is not copied into the image)
+ARG VITE_GOOGLE_CLIENT_ID=
+ARG VITE_GA_MEASUREMENT_ID=
+ENV VITE_GOOGLE_CLIENT_ID=$VITE_GOOGLE_CLIENT_ID \
+    VITE_GA_MEASUREMENT_ID=$VITE_GA_MEASUREMENT_ID
 RUN npm run build
 
 # Static site served by nginx

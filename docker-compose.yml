@@ -4,7 +4,7 @@ services:
       context: .
       target: dev
     ports:
-      - "5273:5173"
+      - "${DEV_PORT:-5273}:5173"
     environment:
       - CHOKIDAR_USEPOLLING=true   # reliable file watching on Docker for Mac
     volumes:
@@ -16,5 +16,8 @@ services:
     build:
       context: .
       target: prod
+      args:
+        VITE_GOOGLE_CLIENT_ID: ${VITE_GOOGLE_CLIENT_ID:-}
+        VITE_GA_MEASUREMENT_ID: ${VITE_GA_MEASUREMENT_ID:-}
     ports:
-      - "8080:80"
+      - "${PROD_PORT:-8180}:80"

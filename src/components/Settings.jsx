@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { GU, hm, totalMs } from '../lib/data.js';
 import { CommitInput } from './Misc.jsx';
+import { PrivacySettings } from './Consent.jsx';
 
 function UnitSelect({ value, onChange, ...rest }) {
   return (
@@ -140,6 +141,8 @@ export function Settings({ D, cid, driveOn, backendName, fsOk, C, A }) {
           </label>
         </div>
       </div>
+
+      <PrivacySettings />
     </>
   );
 }

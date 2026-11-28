@@ -4,6 +4,7 @@ import { FS, FT, GD, LS, NeedAuth, Store, backend, backendName } from './lib/sto
 import { Dashboard } from './components/Dashboard.jsx';
 import { Settings } from './components/Settings.jsx';
 import { Banner, Dialog, Lock, StatusPill, Welcome } from './components/Misc.jsx';
+import { ConsentBanner } from './components/Consent.jsx';
 
 /* Actions that never need the data file, so they skip the "sign in again first" step. */
 const NOGATE = new Set(['reconnect', 'unlink', 'gdconnect', 'theme', 'tab', 'chart', 'range', 'open', 'editses', 'canceledit', 'export', 'dlgno']);
@@ -312,6 +313,7 @@ export default function App() {
       </header>
       <div>{content}</div>
       <Dialog dlg={dlg} A={act} />
+      <ConsentBanner />
     </main>
   );
 }

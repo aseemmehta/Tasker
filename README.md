@@ -16,14 +16,17 @@ npm run preview    # serve dist/ locally
 
 Needs Node 18 or newer.
 
+Copy `.env.example` to `.env` (git-ignored) to set the Docker host ports (`DEV_PORT`, `PROD_PORT`) and the public
+build values `VITE_GOOGLE_CLIENT_ID` and `VITE_GA_MEASUREMENT_ID`.
+
 ### With Docker
 
 ```bash
 docker compose up --build                 # dev server with hot reload: http://localhost:5273
-docker compose --profile prod up --build  # production build served by nginx: http://localhost:8080
+docker compose --profile prod up --build  # production build served by nginx: http://localhost:8180
 ```
 
-For Google Drive sign-in while testing, add `http://localhost:5273` (and `http://localhost:8080`) to the OAuth
+For Google Drive sign-in while testing, add `http://localhost:5273` (and `http://localhost:8180`) to the OAuth
 client's **Authorized JavaScript origins**.
 
 ## Deploy (GitHub Pages)
@@ -35,6 +38,13 @@ client's **Authorized JavaScript origins**.
    from the **Actions** tab.
 
 The app is then at `https://<user>.github.io/<repo>/`.
+
+## Analytics (Google Analytics 4, opt-in)
+
+Set `VITE_GA_MEASUREMENT_ID` (GitHub secret `GA_MEASUREMENT_ID`) to enable it; leave it empty and no banner or GA code
+exists. GA loads only after the visitor clicks **Allow**; the choice is stored in the browser and can be changed in
+**Settings > Privacy**. Only page views are sent: no user ID, no link to Google sign-in, no task data, no query string
+or hash in the URL. Google signals and ad personalisation are off.
 
 ## Google Drive sync
 
@@ -50,5 +60,7 @@ src/App.jsx             state, actions, storage wiring
 src/components/         Dashboard, Settings, shared pieces
 src/lib/data.js         data model, validation, metrics
 src/lib/storage.js      browser cache, local file and Google Drive backends
+src/lib/analytics.js    GA4, loaded only after consent
+src/components/Consent.jsx  consent banner and Privacy settings
 .github/workflows/      deploy.yml
 ```
