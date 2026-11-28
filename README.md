@@ -46,6 +46,12 @@ exists. GA loads only after the visitor clicks **Allow**; the choice is stored i
 **Settings > Privacy**. Only page views are sent: no user ID, no link to Google sign-in, no task data, no query string
 or hash in the URL. Google signals and ad personalisation are off.
 
+## Legal pages
+
+`public/privacy.html` and `public/terms.html` are copied to the site root at build time (`/privacy.html`, `/terms.html`) and
+linked in the app footer. They are the public links used on the Google OAuth consent screen. Replace `[YOUR NAME]` and
+`[CONTACT EMAIL]` in both files, and update them whenever data handling changes (for example before Phase 3 sharing ships).
+
 ## Google Drive sync
 
 The OAuth client ID in `src/config.js` is public by design. In Google Cloud Console, the client's **Authorized
@@ -62,5 +68,6 @@ src/lib/data.js         data model, validation, metrics
 src/lib/storage.js      browser cache, local file and Google Drive backends
 src/lib/analytics.js    GA4, loaded only after consent
 src/components/Consent.jsx  consent banner and Privacy settings
+public/                 privacy.html and terms.html, served as-is
 .github/workflows/      deploy.yml
 ```

@@ -1,6 +1,6 @@
 # Tasker (public repo): Tasks
 
-Last updated: 28 Nov 2026
+Last updated: 28 Nov 2026 (legal pages added)
 Related: `apps-backend` (private, Cloudflare Worker + D1), `apps-local` (private, laptop export)
 
 ## Done
@@ -21,6 +21,14 @@ Related: `apps-backend` (private, Cloudflare Worker + D1), `apps-local` (private
 - [ ] GA4 Admin: Google signals off, event data retention 2 months, stream URL = `github.io` origin (deferred by choice, do later)
 - [x] GitHub repo: secret scanning and push protection on
 - [ ] Optional, maybe later: treat Do Not Track / Global Privacy Control as an automatic decline
+
+## Google OAuth: publish consent screen
+- [ ] Replace `[YOUR NAME]` / `[CONTACT EMAIL]` in `public/privacy.html` and `public/terms.html`
+- [ ] Deploy, then check `<site>/privacy.html` and `<site>/terms.html` open (no login)
+- [ ] Google Auth Platform > Branding: app name, support email, developer contact, privacy and terms links
+- [ ] Data Access: confirm only non-sensitive scopes (`drive.file`)
+- [ ] Audience > Publish app; test Drive connect with a non-test-user account
+- [ ] Authorized JS origins: `http://localhost:5273`, `http://localhost:8180`, `https://<user>.github.io`
 
 ## Phase 2 (frontend side only)
 - [ ] Add API URL as public build variable

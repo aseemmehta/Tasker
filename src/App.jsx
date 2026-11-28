@@ -312,6 +312,9 @@ export default function App() {
         <button className="g" onClick={() => act.theme()} aria-label="Toggle theme">◐</button>
       </header>
       <div>{content}</div>
+      <footer>
+        <a href="./privacy.html">Privacy policy</a> · <a href="./terms.html">Terms of service</a>
+      </footer>
       <Dialog dlg={dlg} A={act} />
       <ConsentBanner />
     </main>
