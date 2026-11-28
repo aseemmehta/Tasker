@@ -1,6 +1,6 @@
 # Tasker (public repo): Tasks
 
-Last updated: 27 Nov 2026
+Last updated: 28 Nov 2026
 Related: `apps-backend` (private, Cloudflare Worker + D1), `apps-local` (private, laptop export)
 
 ## Done
@@ -11,12 +11,16 @@ Related: `apps-backend` (private, Cloudflare Worker + D1), `apps-local` (private
 - [x] Google client ID passed at build time from GitHub secret
 - [x] Google sign-in fixed
 
-## Phase 1: GA4 with consent
-- [ ] Create GA4 property and get measurement ID (manual, see steps)
-- [x] Pass `VITE_GA_MEASUREMENT_ID` in the Build step (code done; still add the `GA_MEASUREMENT_ID` secret in GitHub, manual)
-- [x] Consent banner (GA loads only after accept; choice remembered and changeable)
+## Phase 1: GA4 with consent (done 28 Nov 2026)
+- [x] Create GA4 property and get measurement ID
+- [x] Add `GA_MEASUREMENT_ID` GitHub secret and pass it in the Build step
+- [x] Consent banner (GA loads only after accept; choice remembered and changeable in Settings > Privacy)
 - [x] No user identifiers sent to GA
 - [x] Update CSP for GA domains
+- [x] Checked locally (dev and prod build) and live on GitHub Pages; page hits visible in GA4
+- [ ] GA4 Admin: Google signals off, event data retention 2 months, stream URL = `github.io` origin (deferred by choice, do later)
+- [x] GitHub repo: secret scanning and push protection on
+- [ ] Optional, maybe later: treat Do Not Track / Global Privacy Control as an automatic decline
 
 ## Phase 2 (frontend side only)
 - [ ] Add API URL as public build variable
@@ -35,13 +39,16 @@ Related: `apps-backend` (private, Cloudflare Worker + D1), `apps-local` (private
 - [ ] Graceful behaviour when backend is down or signed out
 
 ## Docker
-- [x] Compose host ports now read `DEV_PORT` / `PROD_PORT` from `.env` (defaults 5273 / 8180); `.env` git-ignored, `.env.example` added
-- [ ] Existing Docker setup still works after each phase (Phase 1: please run `docker compose up --build` once)
+- [x] Compose host ports read `DEV_PORT` / `PROD_PORT` from `.env` (defaults 5273 / 8180); `.env` git-ignored, `.env.example` added
+- [x] Prod image gets public build values (`VITE_GOOGLE_CLIENT_ID`, `VITE_GA_MEASUREMENT_ID`) as compose build args; `.env` kept out of the image
+- [ ] Existing Docker setup still works after each phase (Phase 1: verified)
 
 ## Decisions
 - GA ID is validated (`G-XXXX`); empty ID = no banner, no GA code
 - CSP: GA script limited to the `gtag/js` path; connect/img limited to Google Analytics hosts
+- Empty `VITE_GA_MEASUREMENT_ID` in local `.env` keeps test visits out of the GA property
 
 ## Notes
-- The uploaded zip had hard-coded ports 5273/8080 in compose; fixed to match the `.env` setup described in the prompt
 - No secrets, backend code or exported data in this repo.
+- The `/.well-known/appspecific/com.chrome.devtools.json` CSP message in the prod build Console is Chrome DevTools probing; harmless.
+- Google OAuth origins to keep registered: `http://localhost:5273`, `http://localhost:8180`, `https://<user>.github.io`.
